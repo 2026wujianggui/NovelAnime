@@ -22,17 +22,23 @@ jobs:
           echo "GRADLE=$PWD/gradle-8.0/bin/gradle" >> $GITHUB_ENV
       - name: Build Debug APK
         run: $GRADLE assembleDebug --stacktrace
-      - name: Rename APK
+      - name: Split and commit APK
         run: |
-          mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/小说转动漫.apk
-          ls -l out/
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v1.0-${{ github.run_number }}
-          name: 小说转动漫 v1.0
-          body: 自动生成的小说转AI动漫 App
-          files: out/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          rm -rf apkbin
+          mkdir -p apkbin
+          split -b 600000 app/build/outputs/apk/debug/app-debug.apk apkbin/part_
+          cd apkbin
+          i=0
+          for f in part_*; do
+            base64 -w0 "$f" > "b64_$i.txt"
+            rm -f "$f"
+            i=$((i+1))
+          done
+          echo "COUNT=$i" >> $GITHUB_ENV
+          ls -l
+          cd ..
+          git config user.email "ci@github.com"
+          git config user.name "CI"
+          git add -A apkbin
+          git commit -m "APK chunks $i" || echo "no change"
+          git push
