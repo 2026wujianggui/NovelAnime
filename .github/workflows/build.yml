@@ -22,23 +22,33 @@ jobs:
           echo "GRADLE=$PWD/gradle-8.0/bin/gradle" >> $GITHUB_ENV
       - name: Build Debug APK
         run: $GRADLE assembleDebug --stacktrace
-      - name: Split and commit APK
+      - name: Upload APK chunks via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          rm -rf apkbin
-          mkdir -p apkbin
-          split -b 600000 app/build/outputs/apk/debug/app-debug.apk apkbin/part_
-          cd apkbin
+          DIR=apkbin/run${{ github.run_number }}
+          rm -rf chunks && mkdir -p chunks
+          split -b 600000 app/build/outputs/apk/debug/app-debug.apk chunks/part_
           i=0
-          for f in part_*; do
-            base64 -w0 "$f" > "b64_$i.txt"
-            rm -f "$f"
+          for f in chunks/part_*; do
+            B64=$(base64 -w0 "$f")
+            python3 - "$DIR" "$i" "$B64" << 'PY'
+import sys,os,json,urllib.request,urllib.error
+d,i,b64=sys.argv[1],sys.argv[2],sys.argv[3]
+tok=os.environ["GH_TOKEN"]
+repo=os.environ["GITHUB_REPOSITORY"]
+path=f"{d}/p{i}.b64"
+body=json.dumps({"message":f"chunk {i}","content":b64,"branch":"main"}).encode()
+req=urllib.request.Request(f"https://api.github.com/repos/{repo}/contents/{path}",method="PUT",data=body)
+req.add_header("Authorization",f"token {tok}")
+req.add_header("Accept","application/vnd.github+json")
+req.add_header("Content-Type","application/json")
+try:
+    with urllib.request.urlopen(req,timeout=120) as r:
+        print("ok",path,r.status)
+except urllib.error.HTTPError as e:
+    print("fail",path,e.code,e.read().decode()[:200])
+PY
             i=$((i+1))
           done
-          echo "COUNT=$i" >> $GITHUB_ENV
-          ls -l
-          cd ..
-          git config user.email "ci@github.com"
-          git config user.name "CI"
-          git add -A apkbin
-          git commit -m "APK chunks $i" || echo "no change"
-          git push
+          echo "上传分片数: $i"
