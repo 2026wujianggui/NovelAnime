@@ -43,6 +43,20 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+        // 角色库：定妆图锁脸，这是一致性的关键
+        val topRow = findViewById<Button>(R.id.btnSettings).parent as android.view.ViewGroup
+        val bChar = Button(this).apply {
+            text = "角色库"; setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setOnClickListener { startActivity(Intent(this@MainActivity, CharacterActivity::class.java)) }
+        }
+        topRow.addView(bChar, 1)
+
+        // 导成片
+        val bCompose = Button(this).apply {
+            text = "合成成片"; setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setOnClickListener { composeEpisode() }
+        }
+        topRow.addView(bCompose, 2)
         findViewById<Button>(R.id.btnImport).setOnClickListener { showImportDialog() }
         findViewById<Button>(R.id.btnBatch).setOnClickListener { batchGenerate() }
 
@@ -176,11 +190,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildPrompt(sh: Shot): String {
-        val style = KeyStore.style(this).ifEmpty {
-            "新海诚风格日本动画电影质感，柔和自然光，电影级构图，16:9"
-        }
-        val anch = if (sh.anchor.isNotBlank()) "【人物固定设定，必须严格遵守】${sh.anchor}。" else ""
-        return "$style。$anch【场景】${sh.desc}"
+        // 优先用角色库（可维护 + 有定妆图），没有再退回内置 anchor
+        return CharacterLib.shotPrompt(this, sh.desc, sh.chars)
     }
 
     private fun genImage(sh: Shot, card: LinearLayout) {
@@ -275,5 +286,35 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(s: String) = runOnUiThread {
         Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
+    }
+
+    /** 把已生成的视频片段拼成一集，并导出字幕/分镜表 */
+    private fun composeEpisode() {
+        val vDir = getExternalFilesDir("video")
+        val files = vDir?.listFiles()
+            ?.filter { it.extension == "mp4" }
+            ?.sortedBy { it.name } ?: emptyList()
+        if (files.isEmpty()) { toast("还没有视频片段，先出图再转视频"); return }
+
+        val segs = files.mapIndexed { i, f ->
+            val no = f.nameWithoutExtension.filter { it.isDigit() }.toIntOrNull() ?: (i + 1)
+            val sh = shots.firstOrNull { it.no == no }
+            Composer.Segment(f, sh?.desc?.take(40) ?: "")
+        }
+
+        toast("开始合成 ${segs.size} 段…")
+        lifecycleScope.launch {
+            val out = Composer.composeVideos(this@MainActivity, segs, "第1集.mp4") { p ->
+                runOnUiThread { tvStatus.text = "合成中… $p%" }
+            }
+            val srt = Composer.exportSrt(this@MainActivity, segs, "第1集.srt")
+            Composer.exportShotList(this@MainActivity, segs, "分镜表.txt")
+            runOnUiThread {
+                tvStatus.text = if (out != null)
+                    "✅ 成片：${out.absolutePath}"
+                else "❌ 合成失败（片段参数可能不一致）"
+                toast("字幕已导出：${srt.name}")
+            }
+        }
     }
 }
