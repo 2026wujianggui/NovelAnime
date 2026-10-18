@@ -21,8 +21,36 @@ jobs:
           unzip -q gradle-8.0-bin.zip
           echo "GRADLE=$PWD/gradle-8.0/bin/gradle" >> $GITHUB_ENV
       - name: Build Debug APK
-        run: $GRADLE assembleDebug --stacktrace
+        id: b
+        run: |
+          set -o pipefail
+          $GRADLE assembleDebug --stacktrace 2>&1 | tail -300 > build_err.txt
+          echo "EXIT=$?" >> $GITHUB_ENV
+      - name: Save log
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - << 'PY'
+          import os,base64,json,urllib.request,urllib.error
+          tok=os.environ["GH_TOKEN"]; repo=os.environ["GITHUB_REPOSITORY"]
+          run=os.environ.get("GITHUB_RUN_NUMBER","0")
+          for src,dst in [("build_err.txt", f"logs/run{run}_err.txt")]:
+              try:
+                  c=open(src,encoding="utf-8",errors="ignore").read()
+              except Exception as ex:
+                  c=f"no log: {ex}"
+              body=json.dumps({"message":"log","content":base64.b64encode(c.encode()).decode(),"branch":"main"}).encode()
+              req=urllib.request.Request(f"https://api.github.com/repos/{repo}/contents/{dst}",method="PUT",data=body)
+              req.add_header("Authorization",f"token {tok}")
+              req.add_header("Accept","application/vnd.github+json")
+              req.add_header("Content-Type","application/json")
+              try:
+                  with urllib.request.urlopen(req,timeout=120) as r: print("log ok",dst,r.status)
+              except urllib.error.HTTPError as e: print("log fail",e.code,e.read().decode()[:150])
+          PY
       - name: Upload APK chunks
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
