@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 17
@@ -20,8 +22,17 @@ jobs:
           echo "GRADLE=$PWD/gradle-8.0/bin/gradle" >> $GITHUB_ENV
       - name: Build Debug APK
         run: $GRADLE assembleDebug --stacktrace
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/小说转动漫.apk
+          ls -l out/
+      - name: Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: novelanime-debug
-          path: app/build/outputs/apk/debug/*.apk
+          tag_name: v1.0-${{ github.run_number }}
+          name: 小说转动漫 v1.0
+          body: 自动生成的小说转AI动漫 App
+          files: out/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
