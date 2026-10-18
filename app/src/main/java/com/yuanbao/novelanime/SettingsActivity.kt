@@ -83,12 +83,12 @@ class SettingsActivity : AppCompatActivity() {
             setOnClickListener { fetchModelsUI() }
         }
         // 插到「测试连通性」按钮上方
-        val parent = findViewById<Button>(R.id.btnTest).parent as ViewGroup
-        val idx = (0 until parent.childCount).firstOrNull {
-            parent.getChildAt(it).id == R.id.btnTest
+        val btnParent = findViewById<Button>(R.id.btnTest).parent as ViewGroup
+        val testIdx = (0 until btnParent.childCount).firstOrNull {
+            btnParent.getChildAt(it).id == R.id.btnTest
         }
-        if (idx != null) parent.addView(btnModels, idx)
-        else parent.addView(btnModels)
+        if (testIdx != null) btnParent.addView(btnModels, testIdx)
+        else btnParent.addView(btnModels)
         findViewById<Button>(R.id.btnSave).setOnClickListener { save() }
     }
 
