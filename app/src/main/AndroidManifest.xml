@@ -19,5 +19,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".SettingsActivity" />
+        <activity android:name=".CharacterActivity" />
     </application>
 </manifest>
