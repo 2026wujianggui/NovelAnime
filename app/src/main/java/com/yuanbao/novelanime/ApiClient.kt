@@ -175,4 +175,50 @@ object ApiClient {
             "未连通：${e.message?.take(200)}"
         }
     }
+
+    /**
+     * 拉取模型列表。自动尝试多种 base 组合，
+     * 返回 Pair(可用的 base, 模型 id 列表)
+     */
+    suspend fun fetchModels(baseInput: String, key: String): Pair<String, List<String>> =
+        withContext(Dispatchers.IO) {
+            val b0 = baseInput.trim().trimEnd('/')
+            val candidates = linkedSetOf<String>()
+            candidates.add(b0)
+            if (b0.endsWith("/v1")) candidates.add(b0.removeSuffix("/v1"))
+            else candidates.add("$b0/v1")
+            candidates.add("$b0/v1")
+            if (!b0.endsWith("/v1")) candidates.add(b0.removeSuffix("/v1"))
+
+            val errs = mutableListOf<String>()
+            for (b in candidates) {
+                val url = "$b/models"
+                try {
+                    val s = get(url, key)
+                    val jo = JSONObject(s)
+                    val list = mutableListOf<String>()
+                    val arr = jo.optJSONArray("data")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val o = arr.getJSONObject(i)
+                            val id = o.optString("id").ifEmpty { o.optString("name") }
+                            if (id.isNotBlank()) list.add(id)
+                        }
+                    } else {
+                        jo.optJSONArray("models")?.let { a ->
+                            for (i in 0 until a.length()) {
+                                val o = a.getJSONObject(i)
+                                val id = o.optString("id").ifEmpty { o.optString("name") }
+                                if (id.isNotBlank()) list.add(id)
+                            }
+                        }
+                    }
+                    if (list.isNotEmpty()) return@withContext Pair(b, list)
+                    errs.add("$url → 返回为空")
+                } catch (e: Exception) {
+                    errs.add("$url → ${e.message?.take(80)}")
+                }
+            }
+            throw ApiErr("没能拉到模型列表：\n${errs.joinToString("\n")}")
+        }
 }
