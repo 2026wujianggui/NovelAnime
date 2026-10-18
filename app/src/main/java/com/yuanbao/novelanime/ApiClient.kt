@@ -61,6 +61,26 @@ object ApiClient {
     suspend fun textToImage(
         base: String, key: String, model: String, prompt: String, size: String = "1280x720"
     ): Bitmap = withContext(Dispatchers.IO) {
+        // 断流很常见（移动网络切基站），失败自动重试 3 次
+        var lastErr: Exception? = null
+        repeat(3) { attempt ->
+            try { return@withContext textToImageOnce(base, key, model, prompt, size) }
+            catch (e: Exception) {
+                lastErr = e
+                val msg = e.message ?: ""
+                val retryable = msg.contains("abort", true) || msg.contains("timeout", true) ||
+                                msg.contains("reset", true) || msg.contains("closed", true) ||
+                                msg.contains("Failed to connect", true)
+                if (!retryable) throw e
+                kotlinx.coroutines.delay(3000L * (attempt + 1))
+            }
+        }
+        throw lastErr ?: ApiErr("出图失败")
+    }
+
+    private fun textToImageOnce(
+        base: String, key: String, model: String, prompt: String, size: String
+    ): Bitmap {
         val body = JSONObject().apply {
             put("model", model)
             put("prompt", prompt)
