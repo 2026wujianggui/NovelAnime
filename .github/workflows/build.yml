@@ -13,15 +13,15 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Grant execute permission
-        run: chmod +x ./gradlew || true
-      - name: Build Debug APK
+      - name: Setup Gradle 8.0
         run: |
-          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.0 2>/dev/null || true; fi
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
+          wget -q https://services.gradle.org/distributions/gradle-8.0-bin.zip
+          unzip -q gradle-8.0-bin.zip
+          echo "GRADLE=$PWD/gradle-8.0/bin/gradle" >> $GITHUB_ENV
+      - name: Build Debug APK
+        run: $GRADLE assembleDebug --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: novelanime-debug
           path: app/build/outputs/apk/debug/*.apk
