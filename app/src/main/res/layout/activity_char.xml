@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="#14141C" android:padding="12dp">
+
+    <TextView android:text="角色库 · 定妆图" android:textSize="18sp"
+        android:textStyle="bold" android:textColor="#FFB86C"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+    <TextView android:text="先给每个角色生成一张定妆图，之后所有分镜都用它锁脸"
+        android:textSize="11sp" android:textColor="#8890A0"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingTop="4dp" android:paddingBottom="8dp" />
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:id="@+id/listChars" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical" />
+    </ScrollView>
+
+    <Button android:id="@+id/btnGenAll" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="一键生成全部定妆图"
+        android:layout_marginTop="8dp" />
+</LinearLayout>
